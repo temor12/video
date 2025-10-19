@@ -54,11 +54,11 @@
             --accent: #06b6d4;
             --text: #f1f5f9;
             --text-light: #cbd5e1;
-            --bg: #000000;
-            --card: #1a1a1a;
-            --header: #000000;
-            --footer: #000000;
-            --border: #333333;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --header: #0f172a;
+            --footer: #0f172a;
+            --border: #334155;
             --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
 
@@ -275,6 +275,46 @@
             background: var(--primary);
             color: white;
             border-color: var(--primary);
+        }
+        
+        /* الأزرار الفرعية */
+        .sub-buttons-container {
+            display: none;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(59, 130, 246, 0.05);
+            border-radius: var(--radius);
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .sub-buttons-container.active {
+            display: grid;
+        }
+        
+        .sub-btn {
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 500;
+            font-size: 0.85rem;
+            color: var(--text);
+        }
+        
+        .sub-btn:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateY(-1px);
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
         .section-title {
@@ -628,33 +668,55 @@
         let currentLanguage = 'ar';
         let currentTheme = 'light';
         let allVideos = [];
+        let allButtons = [];
         let currentCategory = 'all';
         let currentCategoryName = '';
+        let activeSubButtons = null;
 
-        // تعريف الأزرار الافتراضية
-        const defaultButtons = [
-            { id: 'all', name: { ar: 'جميع الفيديوهات', en: 'All Videos' } },
-            { id: 'programming', name: { ar: 'برمجة', en: 'Programming' } },
-            { id: 'design', name: { ar: 'تصميم', en: 'Design' } },
-            { id: 'marketing', name: { ar: 'تسويق', en: 'Marketing' } },
-            { id: 'business', name: { ar: 'أعمال', en: 'Business' } },
-            { id: 'technology', name: { ar: 'تكنولوجيا', en: 'Technology' } },
-            { id: 'tutorials', name: { ar: 'شروحات', en: 'Tutorials' } },
-            { id: 'reviews', name: { ar: 'مراجعات', en: 'Reviews' } },
-            { id: 'news', name: { ar: 'أخبار', en: 'News' } },
-            { id: 'tips', name: { ar: 'نصائح', en: 'Tips' } }
-        ];
+        // تحميل الأزرار من Firebase
+        async function loadButtons() {
+            try {
+                const db = getFirestore();
+                const querySnapshot = await getDocs(collection(db, "buttons"));
+                allButtons = [];
+                
+                querySnapshot.forEach((doc) => {
+                    const button = { id: doc.id, ...doc.data() };
+                    // تصفية الأزرار المعطوبة
+                    if (button.name_ar && button.name_en && 
+                        button.name_ar !== 'undefined' && button.name_en !== 'undefined') {
+                        allButtons.push(button);
+                    }
+                });
+                
+                createButtons();
+            } catch (error) {
+                console.error("Error loading buttons:", error);
+            }
+        }
 
         // إنشاء الأزرار
         function createButtons() {
             buttonsContainer.innerHTML = '';
             
-            defaultButtons.forEach(button => {
+            // الأزرار الرئيسية (بدون parentId)
+            const mainButtons = allButtons.filter(button => !button.parentId);
+            
+            // إضافة زر "جميع الفيديوهات" إذا لم يكن موجوداً
+            if (!mainButtons.find(btn => btn.id === 'all')) {
+                mainButtons.unshift({
+                    id: 'all',
+                    name_ar: 'جميع الفيديوهات',
+                    name_en: 'All Videos'
+                });
+            }
+            
+            mainButtons.forEach(button => {
                 const buttonElement = document.createElement('button');
                 buttonElement.className = 'category-btn';
                 buttonElement.dataset.category = button.id;
-                buttonElement.dataset.name = button.name[currentLanguage];
-                buttonElement.textContent = button.name[currentLanguage];
+                buttonElement.dataset.name = currentLanguage === 'ar' ? button.name_ar : button.name_en;
+                buttonElement.textContent = currentLanguage === 'ar' ? button.name_ar : button.name_en;
                 
                 if (button.id === 'all') {
                     buttonElement.classList.add('active');
@@ -669,7 +731,65 @@
                     // إضافة النشط للزر المحدد
                     this.classList.add('active');
                     
-                    // تصفية الفيديوهات حسب التصنيف
+                    // إخفاء الأزرار الفرعية النشطة حالياً
+                    if (activeSubButtons) {
+                        activeSubButtons.classList.remove('active');
+                    }
+                    
+                    // إظهار الأزرار الفرعية إذا كان للزر الرئيسي أزرار فرعية
+                    const categoryId = this.dataset.category;
+                    const subButtons = allButtons.filter(btn => btn.parentId === categoryId);
+                    
+                    if (subButtons.length > 0) {
+                        createSubButtons(categoryId, subButtons, this);
+                    } else {
+                        // إذا لم يكن هناك أزرار فرعية، عرض الفيديوهات مباشرة
+                        currentCategory = categoryId;
+                        currentCategoryName = this.dataset.name;
+                        filterVideosByCategory();
+                        
+                        // إخفاء الأزرار وإظهار الفيديوهات
+                        buttonsSection.classList.add('hidden');
+                        videosSection.classList.add('active');
+                        
+                        // تحديث عنوان التصنيف
+                        updateCategoryTitle();
+                    }
+                });
+                
+                buttonsContainer.appendChild(buttonElement);
+            });
+        }
+
+        // إنشاء الأزرار الفرعية
+        function createSubButtons(categoryId, subButtons, parentButton) {
+            // إخفاء الأزرار الفرعية النشطة حالياً
+            if (activeSubButtons) {
+                activeSubButtons.classList.remove('active');
+            }
+            
+            // إنشاء حاوية للأزرار الفرعية
+            let subButtonsContainer = parentButton.nextElementSibling;
+            
+            // إذا لم تكن هناك حاوية موجودة، قم بإنشاء واحدة
+            if (!subButtonsContainer || !subButtonsContainer.classList.contains('sub-buttons-container')) {
+                subButtonsContainer = document.createElement('div');
+                subButtonsContainer.className = 'sub-buttons-container';
+                parentButton.parentNode.insertBefore(subButtonsContainer, parentButton.nextSibling);
+            }
+            
+            // مسح المحتوى القديم
+            subButtonsContainer.innerHTML = '';
+            
+            // إضافة الأزرار الفرعية
+            subButtons.forEach(subButton => {
+                const subButtonElement = document.createElement('button');
+                subButtonElement.className = 'sub-btn';
+                subButtonElement.dataset.category = `${categoryId}_${subButton.id}`;
+                subButtonElement.dataset.name = currentLanguage === 'ar' ? subButton.name_ar : subButton.name_en;
+                subButtonElement.textContent = currentLanguage === 'ar' ? subButton.name_ar : subButton.name_en;
+                
+                subButtonElement.addEventListener('click', function() {
                     currentCategory = this.dataset.category;
                     currentCategoryName = this.dataset.name;
                     filterVideosByCategory();
@@ -682,8 +802,12 @@
                     updateCategoryTitle();
                 });
                 
-                buttonsContainer.appendChild(buttonElement);
+                subButtonsContainer.appendChild(subButtonElement);
             });
+            
+            // إظهار الأزرار الفرعية
+            subButtonsContainer.classList.add('active');
+            activeSubButtons = subButtonsContainer;
         }
 
         // تحديث عنوان التصنيف
@@ -697,6 +821,12 @@
             videosSection.classList.remove('active');
             buttonsSection.classList.remove('hidden');
             
+            // إخفاء الأزرار الفرعية النشطة
+            if (activeSubButtons) {
+                activeSubButtons.classList.remove('active');
+                activeSubButtons = null;
+            }
+            
             // التمرير إلى الأعلى
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
@@ -708,9 +838,18 @@
             if (currentCategory === 'all') {
                 filteredVideos = allVideos;
             } else {
-                filteredVideos = allVideos.filter(video => 
-                    video.category && video.category.toLowerCase() === currentCategory
-                );
+                filteredVideos = allVideos.filter(video => {
+                    // إذا كان التصنيف يحتوي على _ فهذا يعني أنه زر فرعي
+                    if (currentCategory.includes('_')) {
+                        const [mainCategory, subCategory] = currentCategory.split('_');
+                        return video.category && 
+                               video.category.toLowerCase() === mainCategory &&
+                               video.subcategory && 
+                               video.subcategory.toLowerCase() === subCategory;
+                    } else {
+                        return video.category && video.category.toLowerCase() === currentCategory;
+                    }
+                });
             }
             
             // تحديث عدد الفيديوهات
@@ -788,8 +927,6 @@
                 querySnapshot.forEach((doc) => {
                     allVideos.push({ id: doc.id, ...doc.data() });
                 });
-                
-                // لا نعرض الفيديوهات تلقائياً، فقط عند الضغط على الأزرار
             } catch (error) {
                 console.error("Error loading videos:", error);
             }
@@ -868,7 +1005,7 @@
 
         // تحميل الفيديوهات وإنشاء الأزرار عند فتح الصفحة
         window.addEventListener('DOMContentLoaded', function() {
-            createButtons();
+            loadButtons();
             loadVideos();
             updateBackButtonText();
         });
