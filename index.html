@@ -169,6 +169,27 @@
             border-color: rgba(255, 255, 255, 0.5);
         }
         
+        /* زر الرجوع في الهيدر */
+        .back-home-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 5px 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            text-decoration: none;
+        }
+        
+        .back-home-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+        
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -544,7 +565,7 @@
                 padding: 10px;
             }
             
-            .control-btn {
+            .control-btn, .back-home-btn {
                 padding: 4px 6px;
                 font-size: 9px;
             }
@@ -584,6 +605,10 @@
             </div>
             
             <div class="header-controls">
+                <a href="https://alkarradatech.xyz/index.html/" class="back-home-btn" title="العودة للصفحة الرئيسية">
+                    <i class="fas fa-home"></i>
+                    <span>الرئيسية</span>
+                </a>
                 <button class="control-btn" id="themeToggle">
                     <i class="fas fa-moon"></i>
                     <span>ليلي</span>
